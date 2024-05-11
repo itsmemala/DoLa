@@ -264,7 +264,7 @@ if __name__ == "__main__":
         if args.repetition_penalty is None:
             args.repetition_penalty = 1.2
     answers = []
-    result_dict = {'is_correct': [], 'model_answer': [], 'model_completion': [], 'full_input_text': []}
+    result_dict = {'is_correct': [], 'model_answer': [], 'model_completion': [], 'full_input_text': []} #, 'raw_model_generation': []}
     retry_times = args.retry
     for sample in tqdm(list_data_dict):
         model_answer = None

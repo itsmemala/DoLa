@@ -198,12 +198,12 @@ if __name__ == "__main__":
         if args.repetition_penalty is None:
             args.repetition_penalty = 1.2
     answers = []
-    result_dict = {'question': [], 'model_completion': [], 'raw_input_text': [], 'raw_model_generation': []}
+    result_dict = {'question': [], 'model_completion': [], 'full_input_text': []} #, 'raw_model_generation': []}
     for sample in tqdm(list_data_dict):
         input_text = build_prompt(sample)
         generate_kwargs = dict(max_new_tokens=args.max_new_tokens, top_p=args.top_p, top_k=args.top_k, temperature=args.temperature, repetition_penalty=args.repetition_penalty, mode=mode, mature_layer=mature_layer, premature_layer=premature_layer, candidate_premature_layers=candidate_premature_layers)
         model_completion, c_dist = llm.generate(input_text, **generate_kwargs)
-        result_dict['raw_model_generation'].append(model_completion)
+        # result_dict['raw_model_generation'].append(model_completion)
         for stop_word in stop_word_list:
             length_to_remove = len(stop_word)
             if model_completion[-length_to_remove:] == stop_word:
@@ -215,7 +215,7 @@ if __name__ == "__main__":
         model_answer = model_completion
         result_dict['model_completion'].append(model_completion)
         result_dict['question'].append(sample)
-        result_dict['raw_input_text'].append(input_text)
+        result_dict['full_input_text'].append(input_text)
         if DEBUG:
             print(f'Full input_text:\n{input_text}\n\n')
         print(f'Question: {sample}\n\n'
