@@ -279,7 +279,7 @@ if __name__ == "__main__":
     for idx,sample in enumerate(tqdm(list_data_dict)):
         if args.early_exit_w_probe == True:
             candidate_premature_layers = best_layers[idx] + 1 # shift indexing from 0-31 to 1-32
-            print(candidate_premature_layers)
+            candidate_premature_layers = [layer for layer in candidate_premature_layers if layer!=32] # Exclude last layer
             premature_layer_dist = {l:0 for l in candidate_premature_layers}
         model_answer = None
         for i in range(retry_times):
