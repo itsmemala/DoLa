@@ -181,6 +181,8 @@ if __name__ == "__main__":
     parser.add_argument("--output-path", type=str, default="./strqa_result")
     # parallel mode (split the dataset into multiple parts, inference by separate processes)
     parser.add_argument("--early-exit-layers", type=str, default="-1")
+    parser.add_argument("--early-exit-w-probe", type=bool, default=False)
+    parser.add_argument("--best_layers_file_path", type=str, default="")
     parser.add_argument("--parallel", action="store_true")
     parser.add_argument("--total-shard", type=int, default=8)
     parser.add_argument("--shard-id", type=int, default=None)
@@ -238,7 +240,7 @@ if __name__ == "__main__":
     stop_word_list = ["Q:", "\n\n##"]
     llm.set_stop_words(stop_word_list)
     early_exit_layers = [int(x) for x in args.early_exit_layers.split(',')]
-    if len(early_exit_layers) == 1:
+    if len(early_exit_layers) == 1 and args.early_exit_w_probe == False:
         print("MODE: naive decoding from the last layer", flush=True)
         mode = "baseline"
         mature_layer = None
@@ -246,7 +248,7 @@ if __name__ == "__main__":
         candidate_premature_layers = None
         if args.repetition_penalty is None:
             args.repetition_penalty = 1.0
-    elif len(early_exit_layers) == 2:
+    elif len(early_exit_layers) == 2 and args.early_exit_w_probe == False:
         print(f"MODE: DoLa-static decoding with mature layer: {early_exit_layers[1]} and premature layer: {early_exit_layers[0]}")
         mode = "dola-static"
         mature_layer = early_exit_layers[1]
@@ -254,7 +256,7 @@ if __name__ == "__main__":
         candidate_premature_layers = None
         if args.repetition_penalty is None:
             args.repetition_penalty = 1.2
-    else:
+    elif args.early_exit_w_probe == False:
         print(f"MODE: DoLa decoding with mature layer: {early_exit_layers[-1]} and premature layers: {early_exit_layers[:-1]}")
         mode = "dola"
         mature_layer = early_exit_layers[-1]
@@ -263,10 +265,21 @@ if __name__ == "__main__":
         premature_layer_dist = {l:0 for l in candidate_premature_layers}
         if args.repetition_penalty is None:
             args.repetition_penalty = 1.2
+    else:
+        print(f"MODE: DoLa decoding with mature layer: {early_exit_layers[-1]} and probe based premature layers")
+        mode = "dola"
+        mature_layer = early_exit_layers[-1]
+        premature_layer = None
+        if args.repetition_penalty is None:
+            args.repetition_penalty = 1.2
+        best_layers = np.load(f'{args.best_layers_file_path}.npy')
     answers = []
     result_dict = {'is_correct': [], 'model_answer': [], 'model_completion': [], 'full_input_text': []} #, 'raw_model_generation': []}
     retry_times = args.retry
-    for sample in tqdm(list_data_dict):
+    for idx,sample in enumerate(tqdm(list_data_dict)):
+        if args.early_exit_w_probe == True:
+            candidate_premature_layers = best_layers[idx]
+            premature_layer_dist = {l:0 for l in candidate_premature_layers}
         model_answer = None
         for i in range(retry_times):
             input_text = build_prompt(sample['question'], N_SHOT, COT_FLAG, args.do_shuffle)
