@@ -190,13 +190,13 @@ if __name__ == "__main__":
                 premature_layer_dist[k] += v
         # model_answer = clean_answer(model_completion)
         model_answer = model_completion
-        checkgens = ['Q:','QA2:','Q.', 'B:']
+        checkgens = ['Q:','QA1:','QA2:','Q.', 'B:']
         for check_gen in checkgens: # Fix generation stopping errors
             model_answer = model_answer.split(check_gen)[0]   
         # print(input_text)
         # print(model_completion)
         print('\nModel answer:',model_answer)
-        if idx==10: break
+        # if idx==10: break
         # is_cor = is_correct(model_answer, sample['output'])
         labels_dict = {'exact_match': 0.0,
                         'rouge1_to_target':0.0,
