@@ -194,7 +194,7 @@ if __name__ == "__main__":
         reference_answers_unformatted = all_ref_answers[idx]
         reference_answers = reference_answers_unformatted['aliases'] + reference_answers_unformatted['normalized_aliases']
         for answer in reference_answers:
-            predictions = [responses[i]['response1'].lstrip()]
+            predictions = [model_answer.lstrip()]
             references = [answer]
             results = exact_match_metric.compute(predictions=predictions,
                                                     references=references,
@@ -213,15 +213,15 @@ if __name__ == "__main__":
         result_dict['full_input_text'].append(input_text)
         if DEBUG:
             print(f'Full input_text:\n{input_text}\n\n')
-        print(f'Question: {sample["instruction"]}\n\n'
-            f'Answers: {extract_answer_from_output(sample["output"])}\n\n'
-            f'Model Answers: {model_answer}\n\n'
-            f'Model Completion: {model_completion}\n\n'
-            f'Is correct: {is_cor}\n\n')
+            # print(f'Question: {sample["instruction"]}\n\n'
+            #     f'Answers: {extract_answer_from_output(sample["output"])}\n\n'
+            #     f'Model Answers: {model_answer}\n\n'
+            #     f'Model Completion: {model_completion}\n\n'
+            #     f'Is correct: {is_cor}\n\n')
 
         print(f'Num of total question: {len(answers)}, '
-            f'correct num: {sum(answers)}, '
-            f'correct rate: {float(sum(answers))/len(answers)}.')
+                f'correct num: {sum(answers)}, '
+                f'correct rate: {float(sum(answers))/len(answers)}.')
 
     if mode == "dola"and args.debug:
         total_tokens = sum(premature_layer_dist.values())
