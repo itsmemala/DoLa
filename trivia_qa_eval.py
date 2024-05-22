@@ -25,7 +25,7 @@ INVALID_ANS = "[invalid]"
 
 N_SHOT = 8
 COT_FLAG = True
-DEBUG = True
+DEBUG = False
 ANSWER_TRIGGER = "The answer is"
 
 rouge = evaluate.load('rouge')
