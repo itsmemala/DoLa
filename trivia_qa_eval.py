@@ -189,7 +189,9 @@ if __name__ == "__main__":
             for k, v in c_dist.items():
                 premature_layer_dist[k] += v
         model_answer = clean_answer(model_completion)
-        print(model_completion,model_answer)
+        print(input_text)
+        print(model_completion)
+        print(model_answer)
         if idx==10: break
         # is_cor = is_correct(model_answer, sample['output'])
         labels_dict = {'exact_match': 0.0,
