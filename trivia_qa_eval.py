@@ -8,6 +8,7 @@ import random
 import torch
 import numpy as np
 from datasets import load_dataset
+import evaluate
 import transformers
 from tqdm import tqdm, trange
 import argparse
@@ -26,6 +27,10 @@ N_SHOT = 8
 COT_FLAG = True
 DEBUG = True
 ANSWER_TRIGGER = "The answer is"
+
+rouge = evaluate.load('rouge')
+exact_match_metric = evaluate.load("exact_match")
+        
 
 def extract_answer_from_output(completion):
     match = ANS_RE.search(completion)
