@@ -190,7 +190,7 @@ if __name__ == "__main__":
                 premature_layer_dist[k] += v
         # model_answer = clean_answer(model_completion)
         model_answer = model_completion
-        checkgens = ['QA2:','Q.', 'B:']
+        checkgens = ['Q:','QA2:','Q.', 'B:']
         for check_gen in checkgens: # Fix generation stopping errors
             model_answer = model_answer.split(check_gen)[0]   
         # print(input_text)
