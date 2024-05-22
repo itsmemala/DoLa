@@ -188,10 +188,14 @@ if __name__ == "__main__":
         if mode == "dola":
             for k, v in c_dist.items():
                 premature_layer_dist[k] += v
-        model_answer = clean_answer(model_completion)
-        print(input_text)
-        print(model_completion)
-        print(model_answer)
+        # model_answer = clean_answer(model_completion)
+        model_answer = model_completion
+        checkgens = ['QA2:','Q.', 'B:']
+        for check_gen in checkgens: # Fix generation stopping errors
+            model_answer = model_answer.split(check_gen)[0]   
+        # print(input_text)
+        # print(model_completion)
+        print('\nModel answer:',model_answer)
         if idx==10: break
         # is_cor = is_correct(model_answer, sample['output'])
         labels_dict = {'exact_match': 0.0,
