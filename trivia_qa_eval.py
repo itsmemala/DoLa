@@ -93,7 +93,7 @@ def set_seed(seed):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model-name", type=str, default="baffo32/decapoda-research-llama-7B-hf")
+    parser.add_argument("--model-name", type=str, default="huggyllama/llama-7b") # "baffo32/decapoda-research-llama-7B-hf"
     parser.add_argument("--num-gpus", type=str, default="1")
     parser.add_argument("--max_gpu_memory", type=int, default=27)
     parser.add_argument("--device", type=str, choices=["cuda", "cpu"], default="cuda")
@@ -124,8 +124,8 @@ if __name__ == "__main__":
 
     print('Loading data..')
     # Load data
-    use_split = 'validation'
-    len_dataset = 1800
+    use_split = 'train' #'validation'
+    len_dataset = 5000 #1800
     start_at = 0
     hf_dataset_name = 'mandarjoshi/trivia_qa'
     dataset = load_dataset(hf_dataset_name, 'rc.nocontext', streaming= True)[use_split]
