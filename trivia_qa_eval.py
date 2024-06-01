@@ -124,8 +124,8 @@ if __name__ == "__main__":
 
     print('Loading data..')
     # Load data
-    use_split = 'train' #'validation'
-    len_dataset = 5000 #1800
+    use_split = 'validation' # 'validation' / 'train'
+    len_dataset = 1800 # 1800 / 5000
     start_at = 0
     hf_dataset_name = 'mandarjoshi/trivia_qa'
     dataset = load_dataset(hf_dataset_name, 'rc.nocontext', streaming= True)[use_split]
