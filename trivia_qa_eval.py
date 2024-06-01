@@ -166,21 +166,31 @@ if __name__ == "__main__":
             args.repetition_penalty = 1.2
     else:
         print(f"MODE: DoLa decoding with mature layer: {early_exit_layers[-1]} and probe based premature layers")
-        mode = "dola"
-        mature_layer = early_exit_layers[-1]
-        premature_layer = None
-        if args.repetition_penalty is None:
-            args.repetition_penalty = 1.2
         best_layers = np.load(f'{args.best_layers_file_path}.npy')
     answers = []
     result_dict = {'is_correct': [], 'model_answer': [], 'model_completion': [], 'full_input_text': []}
     for idx,sample in enumerate(tqdm(prompts)):
         if args.early_exit_w_probe == True:
-            # candidate_premature_layers = best_layers[idx] + 1 # shift indexing from 0-31 to 1-32
-            # candidate_premature_layers = [layer for layer in candidate_premature_layers if layer!=32] # Exclude last layer
-            lower_most_layer = np.min(best_layers[idx] + 1) # shift indexing from 0-31 to 1-32
-            candidate_premature_layers = [layer for layer in range(lower_most_layer+1) if layer%2==0 and layer!=32]
-            premature_layer_dist = {l:0 for l in candidate_premature_layers}
+            # # candidate_premature_layers = best_layers[idx] + 1 # shift indexing from 0-31 to 1-32
+            # # candidate_premature_layers = [layer for layer in candidate_premature_layers if layer!=32] # Exclude last layer
+            # lower_most_layer = np.min(best_layers[idx] + 1) # shift indexing from 0-31 to 1-32
+            # candidate_premature_layers = [layer for layer in range(lower_most_layer+1) if layer%2==0 and layer!=32]
+            # premature_layer_dist = {l:0 for l in candidate_premature_layers}
+            if best_layers[idx]!=-1:
+                mode = "dola"
+                mature_layer = early_exit_layers[-1]
+                premature_layer = None
+                if args.repetition_penalty is None:
+                    args.repetition_penalty = 1.2
+                candidate_premature_layers = [best_layers[idx]]
+                premature_layer_dist = {l:0 for l in candidate_premature_layers}
+            if best_layers[idx]==-1: # No contrast; default decoding
+                mode = "baseline"
+                mature_layer = None
+                premature_layer = None
+                candidate_premature_layers = None
+                if args.repetition_penalty is None:
+                    args.repetition_penalty = 1.0
         # input_text = build_prompt(sample['instruction'], N_SHOT, COT_FLAG, args.do_shuffle)
         input_text = sample
         generate_kwargs = dict(max_new_tokens=args.max_new_tokens, do_sample=args.do_sample, top_p=args.top_p, top_k=args.top_k, temperature=args.temperature, repetition_penalty=args.repetition_penalty, mode=mode, mature_layer=mature_layer, premature_layer=premature_layer, candidate_premature_layers=candidate_premature_layers, relative_top=args.relative_top)
