@@ -182,7 +182,8 @@ if __name__ == "__main__":
                 premature_layer = None
                 if args.repetition_penalty is None:
                     args.repetition_penalty = 1.2
-                candidate_premature_layers = [best_layers[idx]]
+                # candidate_premature_layers = [best_layers[idx]]
+                candidate_premature_layers = [j for j in range(best_layers[idx]+1)]
                 premature_layer_dist = {l:0 for l in candidate_premature_layers}
             if best_layers[idx]==-1: # No contrast; default decoding
                 mode = "baseline"
