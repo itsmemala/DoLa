@@ -257,7 +257,7 @@ if __name__ == "__main__":
 
     all_list_data_dict = load_csv(fp)
 
-    file_path = f'~/Desktop/honest_llama_data/responses/tqa_gen_greedy_responses_test.json'
+    file_path = '~/Desktop/honest_llama_data/responses/tqa_gen_greedy_responses_test.json'
     with open(file_path, 'r') as read_file:
         all_test_questions = []
         for line in read_file:
