@@ -172,7 +172,6 @@ if __name__ == "__main__":
         if sample in all_test_questions:
             list_data_dict.append(sample)
     print(len(list_data_dict))
-    exit()
 
     if args.debug:
         list_data_dict = list_data_dict[:10]
