@@ -169,9 +169,10 @@ if __name__ == "__main__":
             all_test_questions.append(row['prompt'])
     list_data_dict = []
     for sample in all_list_data_dict:
-        if sample['question'] in all_test_questions:
+        if sample in all_test_questions:
             list_data_dict.append(sample)
     print(len(list_data_dict))
+    exit()
 
     if args.debug:
         list_data_dict = list_data_dict[:10]
