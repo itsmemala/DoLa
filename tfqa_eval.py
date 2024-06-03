@@ -159,7 +159,19 @@ if __name__ == "__main__":
         download_url(
             'https://raw.githubusercontent.com/sylinrl/TruthfulQA/main/TruthfulQA.csv', args.data_path)
 
-    list_data_dict = load_csv(fp)
+    all_list_data_dict = load_csv(fp)
+
+    file_path = 'tqa_gen_greedy_responses_test.json'
+    with open(file_path, 'r') as read_file:
+        all_test_questions = []
+        for line in read_file:
+            row = json.loads(line)
+            all_test_questions.append(row['prompt'])
+    list_data_dict = []
+    for sample in all_list_data_dict:
+        if sample['question'] in all_test_questions:
+            list_data_dict.append(sample)
+    print(len(list_data_dict))
 
     if args.debug:
         list_data_dict = list_data_dict[:10]
