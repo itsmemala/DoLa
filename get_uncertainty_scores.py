@@ -55,12 +55,13 @@ def main():
     print('Loading model..')
     # tokenizer = llama.LlamaTokenizer.from_pretrained(MODEL)
     # model = llama.LlamaForCausalLM.from_pretrained(MODEL, low_cpu_mem_usage=True, torch_dtype=torch.float16, device_map="auto")
+    device = "cuda"
     model_name = MODEL
     kwargs = {"torch_dtype": torch.float16, "offload_folder": f"{model_name}/offload"}
     kwargs["device_map"] = "auto"
     tokenizer = AutoTokenizer.from_pretrained(model_name if not 'vicuna' in model_name else 'huggyllama/llama-7b')
     model = AutoModelForCausalLM.from_pretrained(model_name,low_cpu_mem_usage=True, **kwargs).to(device)
-    device = "cuda"
+    
 
     print('Loading model responses..')
     prompts, responses = [], []
