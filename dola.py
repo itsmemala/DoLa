@@ -96,6 +96,7 @@ class DoLa:
 
             if verbose:
                 print('MODEL OUTPUT: \n{0}'.format(output_str))
+                
 
             if remove_stop_words:
                 for stop_word in self.stop_words:

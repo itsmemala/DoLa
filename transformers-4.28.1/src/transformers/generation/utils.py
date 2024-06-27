@@ -2633,6 +2633,7 @@ class GenerationMixin:
         else:
             raise ValueError("You must specify either `base_layer` or `candidate_premature_layers`")
         
+        prob_outputs = []
         while True:
             if synced_gpus:
                 # Under synced_gpus the `forward` call must continue until all gpus complete their sequence.
@@ -2729,6 +2730,10 @@ class GenerationMixin:
             # argmax
             next_tokens = torch.argmax(next_tokens_scores, dim=-1)
 
+            # get orig next token probs at all layers
+            dict_outputs_last_token = [logits_processor(input_ids, dict_outputs[i][:, -1, :]) for i in candidate_premature_layers+[mature_layer]]  # shape: (batch_size, num_features)
+            prob_outputs.append(dict_outputs_last_token)
+
             # finished sentences should have their next token be a padding token
             if eos_token_id is not None:
                 if pad_token_id is None:
@@ -2771,12 +2776,15 @@ class GenerationMixin:
                     decoder_hidden_states=decoder_hidden_states,
                 )
             else:
+                
                 return GreedySearchDecoderOnlyOutput(
                     sequences=input_ids,
                     scores=scores,
                     attentions=decoder_attentions,
                     hidden_states=decoder_hidden_states,
-                    premature_layer_dist=premature_layer_dist,
+                    premature_layer_dist=premature_layer_dist, # 1 indicates the layer chosen for contrast
+                    js_divs=js_divs,
+                    prob_outputs=prob_outputs # next token prob distribution (lm_head output (i.e. logits) -> logits processor) for all candidate layers, at every generation step
                 )
         else:
             return input_ids
