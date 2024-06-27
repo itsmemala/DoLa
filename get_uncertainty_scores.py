@@ -8,7 +8,8 @@ import pickle
 import json
 import jsonlines
 import random
-import llama
+# import llama
+from transformers import AutoTokenizer, AutoModelForCausalLM, LlamaTokenizer
 import argparse
 # from transformers import BitsAndBytesConfig, GenerationConfig
 # from peft import PeftModel
