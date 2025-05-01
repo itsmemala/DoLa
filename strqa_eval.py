@@ -19,6 +19,10 @@ import zipfile
 
 from dola import DoLa
 
+from accelerate import Accelerator, InitProcessGroupKwargs
+from accelerate.utils import gather_object
+import time
+
 transformers.logging.set_verbosity(40)
 
 ANS_RE = re.compile(r"#### (\-?[0-9\.\,]+)")
@@ -201,7 +205,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     model_name = args.model_name
     num_gpus = args.num_gpus
-    device = args.device
+    # device = args.device
 
     # set seed
     set_seed(args.seed)
@@ -236,7 +240,13 @@ if __name__ == "__main__":
     if args.debug:
         list_data_dict = list_data_dict[:10]
     
-    llm = DoLa(model_name, device, num_gpus, args.max_gpu_memory)
+    os.environ["CUDA_VISIBILE_DEVICES"] = "0,1,2,3"
+    kwargs = InitProcessGroupKwargs()
+    kwargs.timeout = datetime.timedelta(seconds=7200)
+    accelerator = Accelerator(kwargs_handlers=[kwargs])
+    device = accelerator.device
+
+    llm = DoLa(model_name, device, num_gpus, args.max_gpu_memory, device_map={"": accelerator.process_index})
     stop_word_list = ["Q:", "\n\n##"]
     llm.set_stop_words(stop_word_list)
     early_exit_layers = [int(x) for x in args.early_exit_layers.split(',')]
@@ -276,55 +286,69 @@ if __name__ == "__main__":
     answers = []
     result_dict = {'is_correct': [], 'model_answer': [], 'model_completion': [], 'full_input_text': []} #, 'raw_model_generation': []}
     retry_times = args.retry
-    for idx,sample in enumerate(tqdm(list_data_dict)):
-        if args.early_exit_w_probe == True:
-            # candidate_premature_layers = best_layers[idx] + 1 # shift indexing from 0-31 to 1-32
-            # candidate_premature_layers = [layer for layer in candidate_premature_layers if layer!=32] # Exclude last layer
-            lower_most_layer = np.min(best_layers[idx] + 1) # shift indexing from 0-31 to 1-32
-            candidate_premature_layers = [layer for layer in range(lower_most_layer+1) if layer%2==0 and layer!=32]
-            premature_layer_dist = {l:0 for l in candidate_premature_layers}
-        model_answer = None
-        for i in range(retry_times):
-            input_text = build_prompt(sample['question'], N_SHOT, COT_FLAG, args.do_shuffle)
-            generate_kwargs = dict(max_new_tokens=args.max_new_tokens, do_sample=args.do_sample, top_p=args.top_p, top_k=args.top_k, temperature=args.temperature, repetition_penalty=args.repetition_penalty, mode=mode, mature_layer=mature_layer, premature_layer=premature_layer, candidate_premature_layers=candidate_premature_layers, relative_top=args.relative_top)
-            model_completion, c_dist = llm.generate(input_text, **generate_kwargs)
-            for stop_word in stop_word_list:
-                length_to_remove = len(stop_word)
-                if model_completion[-length_to_remove:] == stop_word:
-                    model_completion = model_completion[:-length_to_remove]
-            model_completion = model_completion.strip()
-            if mode == "dola":
-                for k, v in c_dist.items():
-                    premature_layer_dist[k] += v
-            model_answer = clean_answer(model_completion, random_guess = (i == retry_times - 1))
-            if model_answer is not None:
-                break
-        is_cor = is_correct(model_answer, sample['answer'])
-        answers.append(is_cor)
-        result_dict['is_correct'].append(is_cor)
-        result_dict['model_answer'].append(model_answer)
-        result_dict['model_completion'].append(model_completion)
-        result_dict['full_input_text'].append(input_text)
-        if DEBUG:
-            print(f'Full input_text:\n{input_text}\n\n')
-        print(f'Question: {sample["question"]}\n\n'
-            f'Answers: {sample["answer"]}\n\n'
-            f'Model Answers: {model_answer}\n\n'
-            f'Model Completion: {model_completion}\n\n'
-            f'Is correct: {is_cor}\n\n')
+    # sync GPUs and start the timer
+    accelerator.wait_for_everyone()
+    start=time.time()
+    with accelerator.split_between_processes(list_data_dict) as list_data_dict_split:
+        for idx,sample in enumerate(tqdm(list_data_dict_split)):
+            if args.early_exit_w_probe == True:
+                # candidate_premature_layers = best_layers[idx] + 1 # shift indexing from 0-31 to 1-32
+                # candidate_premature_layers = [layer for layer in candidate_premature_layers if layer!=32] # Exclude last layer
+                lower_most_layer = np.min(best_layers[idx] + 1) # shift indexing from 0-31 to 1-32
+                candidate_premature_layers = [layer for layer in range(lower_most_layer+1) if layer%2==0 and layer!=32]
+                premature_layer_dist = {l:0 for l in candidate_premature_layers}
+            model_answer = None
+            for i in range(retry_times):
+                input_text = build_prompt(sample['question'], N_SHOT, COT_FLAG, args.do_shuffle)
+                generate_kwargs = dict(max_new_tokens=args.max_new_tokens, do_sample=args.do_sample, top_p=args.top_p, top_k=args.top_k, temperature=args.temperature, repetition_penalty=args.repetition_penalty, mode=mode, mature_layer=mature_layer, premature_layer=premature_layer, candidate_premature_layers=candidate_premature_layers, relative_top=args.relative_top)
+                model_completion, c_dist = llm.generate(input_text, **generate_kwargs)
+                for stop_word in stop_word_list:
+                    length_to_remove = len(stop_word)
+                    if model_completion[-length_to_remove:] == stop_word:
+                        model_completion = model_completion[:-length_to_remove]
+                model_completion = model_completion.strip()
+                if mode == "dola":
+                    for k, v in c_dist.items():
+                        premature_layer_dist[k] += v
+                model_answer = clean_answer(model_completion, random_guess = (i == retry_times - 1))
+                if model_answer is not None:
+                    break
+            is_cor = is_correct(model_answer, sample['answer'])
+            answers.append(is_cor)
+            result_dict['is_correct'].append(is_cor)
+            result_dict['model_answer'].append(model_answer)
+            result_dict['model_completion'].append(model_completion)
+            result_dict['full_input_text'].append(input_text)
+            results=[result_dict]
+            if DEBUG:
+                print(f'Full input_text:\n{input_text}\n\n')
+            # print(f'Question: {sample["question"]}\n\n'
+            #     f'Answers: {sample["answer"]}\n\n'
+            #     f'Model Answers: {model_answer}\n\n'
+            #     f'Model Completion: {model_completion}\n\n'
+            #     f'Is correct: {is_cor}\n\n')
 
-        print(f'Num of total question: {len(answers)}, '
-            f'correct num: {sum(answers)}, '
-            f'correct rate: {float(sum(answers))/len(answers)}.')
+            print(f'Num of total question: {len(answers)}, '
+                f'correct num: {sum(answers)}, '
+                f'correct rate: {float(sum(answers))/len(answers)}.')
+        timediff=time.time()-start
+        print("GPU {}: {} prompts received, generated in {} seconds".format(
+            accelerator.process_index,
+            len(tokenized_prompts_split),
+            timediff,
+            ))
+    # collect results from all the GPUs
+    results_gathered=gather_object(results)
 
-    if mode == "dola" and args.debug:
-        total_tokens = sum(premature_layer_dist.values())
-        if total_tokens > 0:
-            for l in candidate_premature_layers:
-                print('Premature layer {0} was used {1} times, {2}%'.format(l, premature_layer_dist[l], round(premature_layer_dist[l] / total_tokens * 100, 2)))
-    # save results to a json file
-    model_tag = model_name.split('/')[-1] if model_name[-1] != '/' else model_name.split('/')[-2]
-    output_file = args.output_path if args.shard_id is None else (args.output_path+"_"+str(args.shard_id)+".json")
-    with open(output_file, 'w') as f:
-        json.dump(result_dict, f)
-    print(f"{float(sum(answers))/len(answers)}")
+    if accelerator.is_main_process:
+        if mode == "dola" and args.debug:
+            total_tokens = sum(premature_layer_dist.values())
+            if total_tokens > 0:
+                for l in candidate_premature_layers:
+                    print('Premature layer {0} was used {1} times, {2}%'.format(l, premature_layer_dist[l], round(premature_layer_dist[l] / total_tokens * 100, 2)))
+        # save results to a json file
+        model_tag = model_name.split('/')[-1] if model_name[-1] != '/' else model_name.split('/')[-2]
+        output_file = args.output_path if args.shard_id is None else (args.output_path+"_"+str(args.shard_id)+".json")
+        with open(output_file, 'w') as f:
+            json.dump(result_dict, f)
+        print(f"{float(sum(answers))/len(answers)}")

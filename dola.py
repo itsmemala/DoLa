@@ -16,25 +16,25 @@ import pandas as pd
 import numpy as np
 
 class DoLa:
-    def __init__(self, model_name, device, num_gpus, max_gpu_memory=27):
+    def __init__(self, model_name, device, num_gpus, max_gpu_memory=80, device_map=None): #27
         self.model_name = model_name
         self.device = device
         self.num_gpus = num_gpus
         self.stopping_criteria = None
         self.max_gpu_memory = max_gpu_memory
 
-        self.model, self.tokenizer = self.load_model(model_name)
+        self.model, self.tokenizer = self.load_model(model_name,device_map)
 
-    def load_model(self, model_name):
+    def load_model(self, model_name, device_map=None):
         if self.device == "cuda":
             kwargs = {"torch_dtype": torch.float16, "offload_folder": f"{model_name}/offload"}
             if self.num_gpus == "auto":
-                kwargs["device_map"] = "auto"
+                kwargs["device_map"] = "auto" if device_map is None else device_map
             else:
                 self.num_gpus = int(self.num_gpus)
                 if self.num_gpus != 1:
                     kwargs.update({
-                        "device_map": "auto",
+                        "device_map": "auto" if device_map is None else device_map,
                         "max_memory": {i: f"{self.max_gpu_memory}GiB" for i in range(self.num_gpus)},
                     })
         elif self.device == "cpu":
