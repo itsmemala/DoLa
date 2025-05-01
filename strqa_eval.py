@@ -182,6 +182,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_gpu_memory", type=int, default=27)
     parser.add_argument("--device", type=str, choices=["cuda", "cpu"], default="cuda")
     parser.add_argument("--data-path", type=str, default="./strqa")
+    parser.add_argument("--test_data_file", type=str, default=None)
     parser.add_argument("--output-path", type=str, default="./strqa_result")
     # parallel mode (split the dataset into multiple parts, inference by separate processes)
     parser.add_argument("--early-exit-layers", type=str, default="-1")
@@ -232,6 +233,17 @@ if __name__ == "__main__":
             zip_ref.extractall(args.data_path)
 
     list_data_dict = load_jsonl(fp)
+
+    if args.test_data_file is not None:
+        test_list_data_dict = []
+        print(len(list_data_dict),0.2*len(list_data_dict))
+        with open(f'{args.test_data_file}', 'r') as read_file:
+            my_test_data = json.load(read_file)
+        for i,row in enumerate(list_data_dict):
+            if i in my_test_data['index']:
+                test_list_data_dict.append(row)
+        list_data_dict = test_list_data_dict
+
     
     if args.parallel:
         chunk_size = len(list_data_dict) // args.total_shard
