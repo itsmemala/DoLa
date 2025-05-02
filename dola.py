@@ -27,7 +27,7 @@ class DoLa:
 
     def load_model(self, model_name, device_map=None):
         print(self.device,type(self.device))
-        if self.device == "cuda" or type(self.device)==torch.device:
+        if self.device == "cuda" or type(self.device)==torch.device: # latter will be true when using accelerate
             kwargs = {"torch_dtype": torch.float16, "offload_folder": f"{model_name}/offload"}
             if self.num_gpus == "auto":
                 kwargs["device_map"] = "auto" if device_map is None else device_map
@@ -47,8 +47,9 @@ class DoLa:
         model = AutoModelForCausalLM.from_pretrained(model_name,
             low_cpu_mem_usage=True, **kwargs)
 
-        if self.device == "cuda" and self.num_gpus == 1:
-            model.cuda()
+        # if self.device == "cuda" and self.num_gpus == 1:
+        #     model.cuda()
+        model.to(self.device)
         
         return model, tokenizer
 
@@ -82,6 +83,7 @@ class DoLa:
             elif mode == 'dola':
                 assert mature_layer is not None, "mature_layer must be specified"
                 assert candidate_premature_layers is not None, "candidate_premature_layers must be specified"
+                print(input_ids.device,self.model.device)
                 outputs = self.model.generate(input_ids, max_length=max_len, num_return_sequences=1,
                                         output_scores=True, return_dict_in_generate=True, dola_decoding=True,
                                         top_p=top_p, top_k=top_k, temperature=temperature, stopping_criteria=self.stopping_criteria, relative_top=relative_top, 
