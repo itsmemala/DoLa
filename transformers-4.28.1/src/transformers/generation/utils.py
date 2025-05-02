@@ -2784,8 +2784,8 @@ class GenerationMixin:
                     attentions=decoder_attentions,
                     hidden_states=decoder_hidden_states,
                     premature_layer_dist=premature_layer_dist, # 1 indicates the layer chosen for contrast
-                    js_divs=js_divs,
-                    prob_outputs=prob_outputs # next token prob distribution (lm_head output (i.e. logits) -> logits processor) for all candidate layers, at every generation step
+                    # js_divs=js_divs,
+                    # prob_outputs=prob_outputs # next token prob distribution (lm_head output (i.e. logits) -> logits processor) for all candidate layers, at every generation step
                 )
         else:
             return input_ids
