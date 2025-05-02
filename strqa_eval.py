@@ -6,7 +6,6 @@ import json
 import random
 import torch
 import numpy as np
-import transformers
 from tqdm import tqdm, trange
 import argparse
 from collections import defaultdict, Counter
@@ -17,11 +16,13 @@ import ssl
 import urllib.request
 import zipfile
 
-from dola import DoLa
-
 from accelerate import Accelerator, InitProcessGroupKwargs
 from accelerate.utils import gather_object
+import datetime
 import time
+
+import transformers
+from dola import DoLa
 
 transformers.logging.set_verbosity(40)
 

@@ -26,7 +26,8 @@ class DoLa:
         self.model, self.tokenizer = self.load_model(model_name,device_map)
 
     def load_model(self, model_name, device_map=None):
-        if self.device == "cuda":
+        print(self.device,type(self.device))
+        if self.device == "cuda" or type(self.device)==torch.device:
             kwargs = {"torch_dtype": torch.float16, "offload_folder": f"{model_name}/offload"}
             if self.num_gpus == "auto":
                 kwargs["device_map"] = "auto" if device_map is None else device_map
