@@ -43,9 +43,11 @@ class DoLa:
         else:
             raise ValueError(f"Invalid device: {self.device}")
         
-        tokenizer = AutoTokenizer.from_pretrained(model_name if not 'vicuna' in model_name else 'huggyllama/llama-7b')
-        model = AutoModelForCausalLM.from_pretrained(model_name,
-            low_cpu_mem_usage=True, **kwargs)
+        if 'alpaca' in model_name:
+            tokenizer = LlamaTokenizer.from_pretrained(model_name)
+        else:
+            tokenizer = AutoTokenizer.from_pretrained(model_name if not 'vicuna' in model_name else 'huggyllama/llama-7b')
+        model = AutoModelForCausalLM.from_pretrained(model_name,low_cpu_mem_usage=True, **kwargs)
 
         # if self.device == "cuda" and self.num_gpus == 1:
         #     model.cuda()

@@ -18,6 +18,11 @@ import urllib.request
 
 from dola import DoLa
 
+from accelerate import Accelerator, InitProcessGroupKwargs
+from accelerate.utils import gather_object
+import datetime
+import time
+
 transformers.logging.set_verbosity(40)
 
 ANS_RE = re.compile(r"#### (\-?[0-9\.\,]+)")
@@ -136,7 +141,13 @@ if __name__ == "__main__":
         prompts.append(cur_prompt)
         all_ref_answers.append(val['answer'])
     
-    llm = DoLa(model_name, device, num_gpus, args.max_gpu_memory)
+    os.environ["CUDA_VISIBILE_DEVICES"] = "0,1,2,3"
+    kwargs = InitProcessGroupKwargs()
+    kwargs.timeout = datetime.timedelta(seconds=7200)
+    accelerator = Accelerator(kwargs_handlers=[kwargs])
+    device = accelerator.device
+
+    llm = DoLa(model_name, device, num_gpus, args.max_gpu_memory, device_map={"": accelerator.process_index})
     llm.set_stop_words(["Q:", "\end{code}"])
     early_exit_layers = [int(x) for x in args.early_exit_layers.split(',')]
     if len(early_exit_layers) == 1 and args.early_exit_w_probe == False:
@@ -169,90 +180,111 @@ if __name__ == "__main__":
         best_layers = np.load(f'{args.best_layers_file_path}.npy')
     answers = []
     result_dict = {'is_correct': [], 'model_answer': [], 'model_completion': [], 'full_input_text': []}
-    for idx,sample in enumerate(tqdm(prompts)):
-        if args.early_exit_w_probe == True:
-            # # candidate_premature_layers = best_layers[idx] + 1 # shift indexing from 0-31 to 1-32
-            # # candidate_premature_layers = [layer for layer in candidate_premature_layers if layer!=32] # Exclude last layer
-            # lower_most_layer = np.min(best_layers[idx] + 1) # shift indexing from 0-31 to 1-32
-            # candidate_premature_layers = [layer for layer in range(lower_most_layer+1) if layer%2==0 and layer!=32]
-            # premature_layer_dist = {l:0 for l in candidate_premature_layers}
-            if best_layers[idx]!=-1:
-                mode = "dola"
-                mature_layer = early_exit_layers[-1]
-                premature_layer = None
-                if args.repetition_penalty is None:
-                    args.repetition_penalty = 1.2
-                # candidate_premature_layers = [best_layers[idx]]
-                candidate_premature_layers = [j for j in range(best_layers[idx]+1)]
-                premature_layer_dist = {l:0 for l in candidate_premature_layers}
-            if best_layers[idx]==-1: # No contrast; default decoding
-                mode = "baseline"
-                mature_layer = None
-                premature_layer = None
-                candidate_premature_layers = None
-                if args.repetition_penalty is None:
-                    args.repetition_penalty = 1.0
-        # input_text = build_prompt(sample['instruction'], N_SHOT, COT_FLAG, args.do_shuffle)
-        input_text = sample
-        generate_kwargs = dict(max_new_tokens=args.max_new_tokens, do_sample=args.do_sample, top_p=args.top_p, top_k=args.top_k, temperature=args.temperature, repetition_penalty=args.repetition_penalty, mode=mode, mature_layer=mature_layer, premature_layer=premature_layer, candidate_premature_layers=candidate_premature_layers, relative_top=args.relative_top)
-        model_completion, c_dist = llm.generate(input_text, **generate_kwargs)
-        if mode == "dola":
-            for k, v in c_dist.items():
-                premature_layer_dist[k] += v
-        # model_answer = clean_answer(model_completion)
-        model_answer = model_completion
-        checkgens = ['Q:','QA1:','QA2:','Q.', 'B:']
-        for check_gen in checkgens: # Fix generation stopping errors
-            model_answer = model_answer.split(check_gen)[0]   
-        # print(input_text)
-        # print(model_completion)
-        print('\nModel answer:',model_answer)
-        # if idx==10: break
-        # is_cor = is_correct(model_answer, sample['output'])
-        labels_dict = {'exact_match': 0.0,
-                        'rouge1_to_target':0.0,
-                        'rouge2_to_target':0.0,
-                        'rougeL_to_target':0.0}
-        reference_answers_unformatted = all_ref_answers[idx]
-        reference_answers = reference_answers_unformatted['aliases'] + reference_answers_unformatted['normalized_aliases']
-        for answer in reference_answers:
-            predictions = [model_answer.lstrip()]
-            references = [answer]
-            results = exact_match_metric.compute(predictions=predictions,
-                                                    references=references,
-                                                    ignore_case=True,
-                                                    ignore_punctuation=True)
-            labels_dict['exact_match'] = max(results['exact_match'], labels_dict['exact_match'])
-            rouge_results = rouge.compute(predictions=predictions, references=references)
-            for rouge_type in ['rouge1','rouge2','rougeL']:
-                labels_dict[rouge_type + '_to_target'] = max(rouge_results[rouge_type],
-                                                                labels_dict[rouge_type + '_to_target'])
-        is_cor = 1 if labels_dict['rouge1_to_target']>0.3 else 0
-        answers.append(is_cor)
-        result_dict['is_correct'].append(is_cor)
-        result_dict['model_answer'].append(model_answer)
-        result_dict['model_completion'].append(model_completion)
-        result_dict['full_input_text'].append(input_text)
-        if DEBUG:
-            print(f'Full input_text:\n{input_text}\n\n')
-            # print(f'Question: {sample["instruction"]}\n\n'
-            #     f'Answers: {extract_answer_from_output(sample["output"])}\n\n'
-            #     f'Model Answers: {model_answer}\n\n'
-            #     f'Model Completion: {model_completion}\n\n'
-            #     f'Is correct: {is_cor}\n\n')
+    # sync GPUs and start the timer
+    accelerator.wait_for_everyone()
+    start=time.time()
+    with accelerator.split_between_processes({'prompts':prompts,'all_ref_answers':all_ref_answers}) as split_dict:
+        prompts_split,all_ref_answers_split = split_dict['prompts'],split_dict['all_ref_answers']
+        for idx,sample in enumerate(tqdm(prompts_split)):
+            if args.early_exit_w_probe == True:
+                # # candidate_premature_layers = best_layers[idx] + 1 # shift indexing from 0-31 to 1-32
+                # # candidate_premature_layers = [layer for layer in candidate_premature_layers if layer!=32] # Exclude last layer
+                # lower_most_layer = np.min(best_layers[idx] + 1) # shift indexing from 0-31 to 1-32
+                # candidate_premature_layers = [layer for layer in range(lower_most_layer+1) if layer%2==0 and layer!=32]
+                # premature_layer_dist = {l:0 for l in candidate_premature_layers}
+                if best_layers[idx]!=-1:
+                    mode = "dola"
+                    mature_layer = early_exit_layers[-1]
+                    premature_layer = None
+                    if args.repetition_penalty is None:
+                        args.repetition_penalty = 1.2
+                    # candidate_premature_layers = [best_layers[idx]]
+                    candidate_premature_layers = [j for j in range(best_layers[idx]+1)]
+                    premature_layer_dist = {l:0 for l in candidate_premature_layers}
+                if best_layers[idx]==-1: # No contrast; default decoding
+                    mode = "baseline"
+                    mature_layer = None
+                    premature_layer = None
+                    candidate_premature_layers = None
+                    if args.repetition_penalty is None:
+                        args.repetition_penalty = 1.0
+            # input_text = build_prompt(sample['instruction'], N_SHOT, COT_FLAG, args.do_shuffle)
+            input_text = sample
+            generate_kwargs = dict(max_new_tokens=args.max_new_tokens, do_sample=args.do_sample, top_p=args.top_p, top_k=args.top_k, temperature=args.temperature, repetition_penalty=args.repetition_penalty, mode=mode, mature_layer=mature_layer, premature_layer=premature_layer, candidate_premature_layers=candidate_premature_layers, relative_top=args.relative_top)
+            model_completion, c_dist = llm.generate(input_text, **generate_kwargs)
+            if mode == "dola":
+                for k, v in c_dist.items():
+                    premature_layer_dist[k] += v
+            # model_answer = clean_answer(model_completion)
+            model_answer = model_completion
+            checkgens = ['Q:','QA1:','QA2:','Q.', 'B:']
+            for check_gen in checkgens: # Fix generation stopping errors
+                model_answer = model_answer.split(check_gen)[0]   
+            # print(input_text)
+            # print(model_completion)
+            print('\nModel answer:',model_answer)
+            # if idx==10: break
+            # is_cor = is_correct(model_answer, sample['output'])
+            labels_dict = {'exact_match': 0.0,
+                            'rouge1_to_target':0.0,
+                            'rouge2_to_target':0.0,
+                            'rougeL_to_target':0.0}
+            reference_answers_unformatted = all_ref_answers_split[idx]
+            reference_answers = reference_answers_unformatted['aliases'] + reference_answers_unformatted['normalized_aliases']
+            for answer in reference_answers:
+                predictions = [model_answer.lstrip()]
+                references = [answer]
+                results = exact_match_metric.compute(predictions=predictions,
+                                                        references=references,
+                                                        ignore_case=True,
+                                                        ignore_punctuation=True)
+                labels_dict['exact_match'] = max(results['exact_match'], labels_dict['exact_match'])
+                rouge_results = rouge.compute(predictions=predictions, references=references)
+                for rouge_type in ['rouge1','rouge2','rougeL']:
+                    labels_dict[rouge_type + '_to_target'] = max(rouge_results[rouge_type],
+                                                                    labels_dict[rouge_type + '_to_target'])
+            is_cor = 1 if labels_dict['rouge1_to_target']>0.3 else 0
+            answers.append(is_cor)
+            result_dict['is_correct'].append(is_cor)
+            result_dict['model_answer'].append(model_answer)
+            result_dict['model_completion'].append(model_completion)
+            result_dict['full_input_text'].append(input_text)
+            results=[result_dict]
+            if DEBUG:
+                print(f'Full input_text:\n{input_text}\n\n')
+                # print(f'Question: {sample["instruction"]}\n\n'
+                #     f'Answers: {extract_answer_from_output(sample["output"])}\n\n'
+                #     f'Model Answers: {model_answer}\n\n'
+                #     f'Model Completion: {model_completion}\n\n'
+                #     f'Is correct: {is_cor}\n\n')
 
-        print(f'Num of total question: {len(answers)}, '
-                f'correct num: {sum(answers)}, '
-                f'correct rate: {float(sum(answers))/len(answers)}.')
+            print(f'Num of total question: {len(answers)}, '
+                    f'correct num: {sum(answers)}, '
+                    f'correct rate: {float(sum(answers))/len(answers)}.')
+        timediff=time.time()-start
+        print("GPU {}: {} prompts received, generated in {} seconds".format(
+        accelerator.process_index,
+        len(list_data_dict_split),
+        timediff,
+        ))
+    # collect results from all the GPUs
+    results_gathered=gather_object(results)
 
-    if mode == "dola"and args.debug:
-        total_tokens = sum(premature_layer_dist.values())
-        if total_tokens > 0:
-            for l in candidate_premature_layers:
-                print('Premature layer {0} was used {1} times, {2}%'.format(l, premature_layer_dist[l], round(premature_layer_dist[l] / total_tokens * 100, 2)))
-    # save results to a json file
-    model_tag = model_name.split('/')[-1] if model_name[-1] != '/' else model_name.split('/')[-2]
-    output_file = args.output_path if args.shard_id is None else (args.output_path+"_"+str(args.shard_id)+".json")
-    with open(output_file, 'w') as f:
-        json.dump(result_dict, f)
-    print(f"{float(sum(answers))/len(answers)}")
+    if accelerator.is_main_process:
+        if mode == "dola"and args.debug:
+            total_tokens = sum(premature_layer_dist.values())
+            if total_tokens > 0:
+                for l in candidate_premature_layers:
+                    print('Premature layer {0} was used {1} times, {2}%'.format(l, premature_layer_dist[l], round(premature_layer_dist[l] / total_tokens * 100, 2)))
+        # save results to a json file
+        model_tag = model_name.split('/')[-1] if model_name[-1] != '/' else model_name.split('/')[-2]
+        output_file = args.output_path if args.shard_id is None else (args.output_path+"_"+str(args.shard_id)+".json")
+        result_dict = {'is_correct': [], 'model_answer': [], 'model_completion': [], 'full_input_text': []} #, 'raw_model_generation': []}
+        for k in range(len(results_gathered)): # k = num of gpus/processes
+            result_dict['is_correct'] += results_gathered[k]['is_correct']
+            result_dict['model_answer'] += results_gathered[k]['model_answer']
+            result_dict['model_completion'] += results_gathered[k]['model_completion']
+            result_dict['full_input_text'] += results_gathered[k]['full_input_text']            
+        with open(output_file, 'w') as f:
+            json.dump(result_dict, f)
+        print(f"{float(sum(answers))/len(answers)}")

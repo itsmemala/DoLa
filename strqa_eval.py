@@ -347,7 +347,7 @@ if __name__ == "__main__":
         timediff=time.time()-start
         print("GPU {}: {} prompts received, generated in {} seconds".format(
             accelerator.process_index,
-            len(tokenized_prompts_split),
+            len(list_data_dict_split),
             timediff,
             ))
     # collect results from all the GPUs
@@ -362,6 +362,12 @@ if __name__ == "__main__":
         # save results to a json file
         model_tag = model_name.split('/')[-1] if model_name[-1] != '/' else model_name.split('/')[-2]
         output_file = args.output_path if args.shard_id is None else (args.output_path+"_"+str(args.shard_id)+".json")
+        result_dict = {'is_correct': [], 'model_answer': [], 'model_completion': [], 'full_input_text': []} #, 'raw_model_generation': []}
+        for k in range(len(results_gathered)): # k = num of gpus/processes
+            result_dict['is_correct'] += results_gathered[k]['is_correct']
+            result_dict['model_answer'] += results_gathered[k]['model_answer']
+            result_dict['model_completion'] += results_gathered[k]['model_completion']
+            result_dict['full_input_text'] += results_gathered[k]['full_input_text']        
         with open(output_file, 'w') as f:
             json.dump(result_dict, f)
         print(f"{float(sum(answers))/len(answers)}")
