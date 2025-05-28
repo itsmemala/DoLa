@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from base_transformers import GemmaTokenizer
 from base_transformers.models import llama3,gemma
 from transformers import AutoTokenizer, AutoModelForCausalLM, LlamaTokenizer
-from transformers.generation.stopping_criteria import StoppingCriteriaList, LLamaQaStoppingCriteria
+from transformers.generation.stopping_criteria import StoppingCriteriaList #, LLamaQaStoppingCriteria
 
 import argparse
 import warnings
@@ -69,7 +69,7 @@ class DoLa:
             stop_word_ids = self.tokenizer.encode('\n' + stop_word)[3:]
             list_stop_word_ids.append(stop_word_ids)
             print("Added stop word: ", stop_word, 'with the ids', stop_word_ids, flush=True)
-        self.stopping_criteria.append(LLamaQaStoppingCriteria(list_stop_word_ids))
+        # self.stopping_criteria.append(LLamaQaStoppingCriteria(list_stop_word_ids))
 
     def generate(self, input_text, max_new_tokens=256, top_p=0.95, top_k=0, temperature=0.8, mature_layer=None, premature_layer=None, candidate_premature_layers=[], mode='baseline', verbose=True, remove_stop_words=False, relative_top=0.1, **kwargs):
         with torch.no_grad():
