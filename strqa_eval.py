@@ -21,10 +21,10 @@ from accelerate.utils import gather_object
 import datetime
 import time
 
-import transformers
+# import transformers
 from dola import DoLa
 
-transformers.logging.set_verbosity(40)
+# transformers.logging.set_verbosity(40)
 
 ANS_RE = re.compile(r"#### (\-?[0-9\.\,]+)")
 INVALID_ANS = "[invalid]"
