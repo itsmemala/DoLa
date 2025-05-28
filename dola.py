@@ -7,7 +7,7 @@ import json
 
 import torch
 import torch.nn.functional as F
-import base_transformers.AutoTokenizer as base_transformers_AutoTokenizer
+from base_transformers import AutoTokenizer as base_transformers_AutoTokenizer
 import base_transformers.models as base_transformers_models
 from transformers import AutoTokenizer, AutoModelForCausalLM, LlamaTokenizer
 from transformers.generation.stopping_criteria import StoppingCriteriaList, LLamaQaStoppingCriteria
