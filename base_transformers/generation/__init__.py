@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 
 from ..utils import OptionalDependencyNotAvailable, _LazyModule, is_flax_available, is_tf_available, is_torch_available
 
+from .utils import GenerationMixin
 
 _import_structure = {
     "configuration_utils": [
@@ -98,7 +99,7 @@ else:
         "StopStringCriteria",
     ]
     _import_structure["utils"] = [
-        "GenerationMixin",
+        # "GenerationMixin",
         "GreedySearchEncoderDecoderOutput",
         "GreedySearchDecoderOnlyOutput",
         "SampleEncoderDecoderOutput",
