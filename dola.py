@@ -7,7 +7,8 @@ import json
 
 import torch
 import torch.nn.functional as F
-import base_transformers
+import base_transformers.AutoTokenizer as base_transformers_AutoTokenizer
+import base_transformers.models as base_transformers_models
 from transformers import AutoTokenizer, AutoModelForCausalLM, LlamaTokenizer
 from transformers.generation.stopping_criteria import StoppingCriteriaList, LLamaQaStoppingCriteria
 
@@ -48,8 +49,8 @@ class DoLa:
             tokenizer = LlamaTokenizer.from_pretrained(model_name)
             model = AutoModelForCausalLM.from_pretrained(model_name,low_cpu_mem_usage=True, **kwargs)
         elif "gemma" in model_name:
-            tokenizer = base_transformers.AutoTokenizer.from_pretrained(model_name)
-            model = base_transformers.models.gemma.GemmaForCausalLM.from_pretrained(MODEL, low_cpu_mem_usage=True, torch_dtype=torch.float16, device_map="auto")
+            tokenizer = base_transformers_AutoTokenizer.from_pretrained(model_name)
+            model = base_transformers_models.gemma.GemmaForCausalLM.from_pretrained(MODEL, low_cpu_mem_usage=True, torch_dtype=torch.float16, device_map="auto")
         else:
             tokenizer = AutoTokenizer.from_pretrained(model_name if not 'vicuna' in model_name else 'huggyllama/llama-7b')
             model = AutoModelForCausalLM.from_pretrained(model_name,low_cpu_mem_usage=True, **kwargs)
