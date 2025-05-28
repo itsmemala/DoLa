@@ -264,7 +264,7 @@ if __name__ == "__main__":
         timediff=time.time()-start
         print("GPU {}: {} prompts received, generated in {} seconds".format(
         accelerator.process_index,
-        len(list_data_dict_split),
+        len(prompts_split),
         timediff,
         ))
     # collect results from all the GPUs
